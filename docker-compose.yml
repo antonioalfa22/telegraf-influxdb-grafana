@@ -1,0 +1,62 @@
+# docker-compose.yml
+version: '2'
+services:
+
+  influxdb:
+    container_name: influxdb
+    image: influxdb:latest
+    ports:
+      - '8086:8086'
+    volumes:
+      - ./data/influxdb/database/:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=db0
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_USERNAME}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_PASSWORD}
+    networks:
+      - mon-gateway
+
+  telegraf:
+    container_name: telegraf
+    image: telegraf:latest
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./data/nginx/logs:/var/log/nginx/
+    depends_on:
+      - influxdb
+    ports:
+      - '8125:8125'
+    networks:
+      - mon-gateway
+      
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data/grafana/:/var/lib/grafana
+      - ./grafana/:/etc/grafana/provisioning
+    depends_on:
+      - influxdb
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USERNAME}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true
+    networks:
+      - mon-gateway
+
+  nginx:
+    container_name: nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - 80:80
+    volumes:
+      - ./data/nginx/logs:/var/log/nginx/
+    networks:
+      - mon-gateway
+
+networks:
+  mon-gateway: {}
